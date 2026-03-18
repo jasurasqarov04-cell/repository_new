@@ -13,7 +13,7 @@ export function HabitList({ metrics }: { metrics: HabitMetrics[] }) {
         <Card
           key={m.habit.id}
           className="animate-slide-up"
-          // @ts-ignore inline style
+          
           style={{ animationDelay: `${i * 30}ms` }}
         >
           <div className="flex items-start gap-4">
