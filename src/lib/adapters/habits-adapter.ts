@@ -67,6 +67,6 @@ export function rowsToEntries(
       status:    normalizeStatus(row.status),
       note:      row.comment?.trim() || undefined,
       timestamp,
-    } satisfies HabitEntry
+    } as HabitEntry
   }).filter(Boolean) as HabitEntry[]
 }
