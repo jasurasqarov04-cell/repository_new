@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Habit Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f8f9fc;
+  --surface: #ffffff;
+  --border: #e5e7ef;
+  --text: #0f1117;
+  --muted: #6b7280;
+  --accent: #3b82f6;
+  --success: #16a34a;
+  --success-bg: #f0fdf4;
+  --warning: #d97706;
+  --warning-bg: #fffbeb;
+  --danger: #dc2626;
+  --danger-bg: #fef2f2;
+  --radius: 14px;
+}
+.dark {
+  --bg: #0f1117;
+  --surface: #161b27;
+  --border: #1e2840;
+  --text: #e8ecf4;
+  --muted: #7a8aaa;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; min-height:100vh; }
+
+/* ── Layout ── */
+.shell { display:flex; height:100vh; overflow:hidden; }
+.sidebar { width:220px; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; }
+.sidebar-logo { padding:20px 24px 16px; border-bottom:1px solid var(--border); }
+.sidebar-logo .sub { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); }
+.sidebar-logo .title { font-size:20px; font-weight:800; letter-spacing:-.03em; }
+nav { padding:12px 8px; flex:1; }
+nav a { display:block; padding:8px 12px; border-radius:10px; font-size:13px; font-weight:500; color:var(--muted); text-decoration:none; margin-bottom:2px; cursor:pointer; transition:all .15s; }
+nav a:hover { background:var(--bg); color:var(--text); }
+nav a.active { background:rgba(59,130,246,.1); color:var(--accent); font-weight:600; }
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+header { height:56px; border-bottom:1px solid var(--border); background:var(--surface); display:flex; align-items:center; padding:0 24px; gap:12px; flex-shrink:0; }
+header .spacer { flex:1; }
+.last-updated { font-size:11px; color:var(--muted); }
+.content { flex:1; overflow-y:auto; padding:24px; }
+.page { display:none; }
+.page.active { display:block; }
+
+/* ── Config ── */
+.config-bar { background:var(--surface); border:1.5px solid #fbbf24; border-radius:var(--radius); padding:16px 20px; margin-bottom:24px; display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+.cfg-group { display:flex; flex-direction:column; gap:5px; flex:1; min-width:200px; }
+.cfg-group label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#d97706; }
+.cfg-group input { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:12px; font-family:monospace; color:var(--text); outline:none; width:100%; }
+.cfg-group input:focus { border-color:var(--accent); }
+.btn { padding:8px 20px; background:#fbbf24; color:#0f1117; font-weight:700; font-size:13px; border:none; border-radius:8px; cursor:pointer; white-space:nowrap; transition:opacity .15s; }
+.btn:hover { opacity:.85; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.btn-outline { background:var(--surface); border:1px solid var(--border); color:var(--text); }
+
+/* ── Cards ── */
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+.card-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:16px; }
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; margin-bottom:20px; }
+.kpi { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+.kpi-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:6px; }
+.kpi-value { font-size:28px; font-weight:800; letter-spacing:-.03em; line-height:1; }
+.kpi-sub { font-size:11px; color:var(--muted); margin-top:3px; }
+.kpi.success { border-left:3px solid var(--success); }
+.kpi.warning { border-left:3px solid var(--warning); }
+.kpi.danger  { border-left:3px solid var(--danger); }
+.kpi.accent  { border-left:3px solid var(--accent); }
+.text-success { color:var(--success); }
+.text-warning { color:var(--warning); }
+.text-danger  { color:var(--danger); }
+.text-accent  { color:var(--accent); }
+
+/* ── Grid ── */
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+.grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px; }
+.mb16 { margin-bottom:16px; }
+.mb24 { margin-bottom:24px; }
+
+/* ── Today block ── */
+.habit-item { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:10px; border:1px solid var(--border); margin-bottom:6px; }
+.habit-item.done { background:var(--success-bg); border-color:transparent; }
+.habit-item.skip { background:var(--warning-bg); border-color:transparent; }
+.habit-item.missed { background:var(--danger-bg); border-color:transparent; }
+.habit-name { font-size:13px; font-weight:500; }
+.habit-name.striked { text-decoration:line-through; color:var(--muted); }
+.habit-cat { font-size:10px; color:var(--muted); margin-top:2px; }
+.badge { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:600; }
+.badge-done   { background:var(--success-bg); color:var(--success); }
+.badge-skip   { background:var(--warning-bg); color:var(--warning); }
+.badge-missed { background:var(--danger-bg);  color:var(--danger); }
+.badge-pending{ background:var(--bg); color:var(--muted); }
+
+/* ── Progress bar ── */
+.pbar-track { height:6px; border-radius:4px; background:var(--border); overflow:hidden; margin:8px 0; }
+.pbar-fill  { height:100%; border-radius:4px; background:var(--success); transition:width .6s; }
+
+/* ── Heatmap ── */
+.heatmap-wrap { overflow-x:auto; }
+.heatmap-grid-wrap { display:inline-flex; gap:0; }
+.heatmap-dow { display:flex; flex-direction:column; gap:3px; margin-right:6px; }
+.heatmap-dow span { height:11px; font-size:9px; color:var(--muted); line-height:11px; }
+.heatmap-cols { display:flex; gap:3px; }
+.hm-col { display:flex; flex-direction:column; gap:3px; }
+.hm-cell { width:11px; height:11px; border-radius:2px; background:var(--border); cursor:default; transition:opacity .1s; }
+.hm-cell:hover { opacity:.75; }
+.hm-0  { background:var(--border); }
+.hm-1  { background:rgba(22,163,74,.2); }
+.hm-2  { background:rgba(22,163,74,.45); }
+.hm-3  { background:rgba(22,163,74,.7); }
+.hm-4  { background:rgb(22,163,74); }
+.hm-legend { display:flex; align-items:center; gap:4px; margin-top:10px; font-size:10px; color:var(--muted); }
+
+/* ── Streak ── */
+.streak-boxes { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+.streak-box { background:var(--bg); border-radius:10px; padding:12px; }
+.streak-box .num { font-size:32px; font-weight:800; letter-spacing:-.03em; }
+.streak-box .lbl { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+.habit-streak-row { display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border); }
+.habit-streak-row:last-child { border-bottom:none; }
+.hs-dot { width:6px; height:32px; border-radius:4px; flex-shrink:0; }
+.hs-name { flex:1; font-size:12px; font-weight:500; }
+.hs-cur { font-size:14px; font-weight:800; color:var(--success); }
+.hs-best { font-size:10px; color:var(--muted); }
+
+/* ── History table ── */
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:left; padding:8px 12px 8px 0; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); border-bottom:1px solid var(--border); }
+td { padding:10px 12px 10px 0; border-bottom:1px solid var(--border); }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:var(--bg); }
+.font-mono { font-family:monospace; }
+
+/* ── Settings ── */
+.settings-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:16px; }
+.settings-row { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--border); gap:16px; }
+.settings-row:last-child { border-bottom:none; }
+.settings-label { font-size:14px; font-weight:500; }
+.settings-desc { font-size:11px; color:var(--muted); margin-top:2px; max-width:360px; }
+.toggle-wrap { display:flex; gap:6px; }
+.toggle-btn { padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; border:1px solid var(--border); background:var(--surface); color:var(--text); cursor:pointer; transition:all .15s; }
+.toggle-btn.active { background:var(--accent); color:#fff; border-color:transparent; }
+.settings-input { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:7px 12px; font-size:12px; font-family:monospace; color:var(--text); outline:none; width:280px; }
+.settings-input:focus { border-color:var(--accent); }
+
+/* ── Status ── */
+.status-bar { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
+.status-dot { width:7px; height:7px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+.status-dot.live  { background:var(--success); box-shadow:0 0 6px var(--success); animation:pulse 2s infinite; }
+.status-dot.error { background:var(--danger); }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+
+/* ── Empty / Loading ── */
+.empty { text-align:center; padding:60px 20px; color:var(--muted); }
+.empty h3 { font-size:16px; margin-bottom:6px; color:var(--text); }
+.loading-bar { height:3px; background:linear-gradient(90deg,var(--accent),#60a5fa,var(--accent)); background-size:200%; animation:loading 1.2s linear infinite; border-radius:2px; }
+@keyframes loading { 0%{background-position:200%}100%{background-position:-200%} }
+
+/* ── Page header ── */
+.page-header { margin-bottom:20px; }
+.page-header h1 { font-size:24px; font-weight:800; letter-spacing:-.03em; }
+.page-header p  { font-size:13px; color:var(--muted); margin-top:4px; }
+
+/* ── Mobile ── */
+.mobile-nav { display:none; }
+@media(max-width:768px) {
+  .sidebar { display:none; }
+  .mobile-nav { display:flex; position:fixed; bottom:0; left:0; right:0; height:60px; background:var(--surface); border-top:1px solid var(--border); z-index:50; }
+  .mobile-nav a { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:10px; font-weight:500; color:var(--muted); text-decoration:none; cursor:pointer; gap:3px; }
+  .mobile-nav a.active { color:var(--accent); }
+  .mobile-nav a .dot { width:5px; height:5px; border-radius:50%; background:var(--accent); }
+  .mobile-nav a:not(.active) .dot { display:none; }
+  .content { padding:16px; padding-bottom:80px; }
+  .grid-2, .grid-3 { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body class="">
+
+<div class="shell">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sub">Habit</div>
+      <div class="title">Dashboard</div>
+    </div>
+    <nav>
+      <a class="active" onclick="showPage('dashboard',this)">Dashboard</a>
+      <a onclick="showPage('habits',this)">Habits</a>
+      <a onclick="showPage('progress',this)">Progress</a>
+      <a onclick="showPage('history',this)">History</a>
+      <a onclick="showPage('settings',this)">Settings</a>
+    </nav>
+    <div style="padding:16px 24px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--muted)">Via Telegram Bot</div>
+      <div style="font-size:11px;color:var(--muted);font-family:monospace">/report</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header>
+      <div id="mobile-title" style="font-weight:700;font-size:14px;display:none">Dashboard</div>
+      <div class="spacer"></div>
+      <div class="status-bar">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Not connected</span>
+      </div>
+      <span class="last-updated" id="last-updated"></span>
+      <button class="btn btn-outline" id="refresh-btn" onclick="loadData(true)" style="padding:6px 14px;font-size:12px">Refresh</button>
+      <button onclick="toggleTheme()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer">Theme</button>
+    </header>
+
+    <div id="loading-bar" style="display:none"><div class="loading-bar"></div></div>
+
+    <div class="content">
+
+      <!-- ══════════════════════════════ CONFIG ══════════════════════════════ -->
+      <div class="config-bar" id="config-bar">
+        <div class="cfg-group" style="flex:2">
+          <label>Google Sheets Endpoint (Apps Script URL)</label>
+          <input id="cfg-endpoint" type="url" placeholder="https://script.google.com/macros/s/YOUR_ID/exec"/>
+        </div>
+        <div class="cfg-group" style="flex:0;min-width:140px">
+          <label>User ID (Telegram)</label>
+          <input id="cfg-uid" type="text" placeholder="871419921"/>
+        </div>
+        <button class="btn" onclick="loadData(true)">Load Data</button>
+      </div>
+
+      <!-- ══════════════════════════════ DASHBOARD ══════════════════════════ -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-header">
+          <h1 id="dash-greeting">Overview</h1>
+          <p id="dash-date"></p>
+        </div>
+        <div class="kpi-grid" id="kpi-grid"></div>
+        <div class="grid-2 mb16">
+          <div class="card">
+            <div class="card-title">Today</div>
+            <div id="today-block"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Streaks</div>
+            <div id="streak-block"></div>
+          </div>
+        </div>
+        <div class="card mb16">
+          <div class="card-title">Activity Heatmap — Last 52 Weeks</div>
+          <div class="heatmap-wrap" id="heatmap"></div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title">Daily — Last 30 Days</div>
+            <canvas id="chart-daily" height="180"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-title">Weekly Completion</div>
+            <canvas id="chart-weekly" height="180"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════ HABITS ════════════════════════════ -->
+      <div class="page" id="page-habits">
+        <div class="page-header"><h1>Habits</h1><p id="habits-sub"></p></div>
+        <div class="card mb16">
+          <div class="card-title">Completion Rate per Habit</div>
+          <canvas id="chart-habit-rate" height="220"></canvas>
+        </div>
+        <div id="habits-list"></div>
+      </div>
+
+      <!-- ══════════════════════════════ PROGRESS ══════════════════════════ -->
+      <div class="page" id="page-progress">
+        <div class="page-header"><h1>Progress</h1><p>Trends and comparisons</p></div>
+        <div class="grid-3 mb16" id="progress-comparison"></div>
+        <div class="grid-2 mb16">
+          <div class="card">
+            <div class="card-title">Strongest vs Weakest</div>
+            <div id="strong-weak"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Activity by Day of Week</div>
+            <canvas id="chart-weekday" height="180"></canvas>
+          </div>
+        </div>
+        <div class="card mb16">
+          <div class="card-title">Monthly Trend</div>
+          <canvas id="chart-monthly" height="160"></canvas>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════ HISTORY ════════════════════════════ -->
+      <div class="page" id="page-history">
+        <div class="page-header"><h1>History</h1><p id="history-sub"></p></div>
+        <div class="card">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Habit</th><th>Status</th><th>Time</th><th>Weekday</th>
+              </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════ SETTINGS ══════════════════════════ -->
+      <div class="page" id="page-settings">
+        <div class="page-header"><h1>Settings</h1><p>Configuration</p></div>
+
+        <div class="settings-card">
+          <div class="settings-row">
+            <div><div class="settings-label">Theme</div></div>
+            <div class="toggle-wrap">
+              <button class="toggle-btn active" id="theme-light" onclick="setTheme('light')">Light</button>
+              <button class="toggle-btn" id="theme-dark" onclick="setTheme('dark')">Dark</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">Google Sheets Endpoint</div>
+              <div class="settings-desc">Apps Script Web App URL</div>
+            </div>
+            <input class="settings-input" id="settings-endpoint" type="url" placeholder="https://script.google.com/..."/>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-label">Telegram User ID</div></div>
+            <input class="settings-input" id="settings-uid" type="text" placeholder="871419921" style="width:140px"/>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-label">Auto Refresh</div>
+              <div class="settings-desc">Reload data automatically every minute</div>
+            </div>
+            <div class="toggle-wrap">
+              <button class="toggle-btn active" id="auto-on"  onclick="setAutoRefresh(true)">On</button>
+              <button class="toggle-btn"        id="auto-off" onclick="setAutoRefresh(false)">Off</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div><div class="settings-label">Last Sync</div></div>
+            <span style="font-size:12px;color:var(--muted)" id="settings-sync">—</span>
+          </div>
+        </div>
+
+        <button class="btn" onclick="saveSettings()">Save & Reload</button>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- Mobile nav -->
+<nav class="mobile-nav">
+  <a class="active" onclick="showPage('dashboard',this)"><div class="dot"></div>Home</a>
+  <a onclick="showPage('habits',this)"><div class="dot"></div>Habits</a>
+  <a onclick="showPage('progress',this)"><div class="dot"></div>Progress</a>
+  <a onclick="showPage('history',this)"><div class="dot"></div>History</a>
+  <a onclick="showPage('settings',this)"><div class="dot"></div>Settings</a>
+</nav>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let STATE = {
+  endpoint: localStorage.getItem('hd-endpoint') || '',
+  uid:      localStorage.getItem('hd-uid') || '',
+  theme:    localStorage.getItem('hd-theme') || 'light',
+  autoRefresh: localStorage.getItem('hd-auto') !== 'false',
+  data: null,
+  lastUpdated: null,
+}
+let autoTimer = null
+let charts = {}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+window.onload = function() {
+  // Read uid from URL ?uid=...
+  const urlUid = new URLSearchParams(location.search).get('uid')
+  if (urlUid) STATE.uid = urlUid
+
+  applyTheme(STATE.theme)
+  document.getElementById('cfg-endpoint').value = STATE.endpoint
+  document.getElementById('cfg-uid').value = STATE.uid
+  document.getElementById('settings-endpoint').value = STATE.endpoint
+  document.getElementById('settings-uid').value = STATE.uid
+
+  setDate()
+
+  if (STATE.endpoint) {
+    loadData(false)
+  }
+
+  startAutoRefresh()
+}
+
+function setDate() {
+  const d = new Date()
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
+  document.getElementById('dash-date').textContent =
+    `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`
+}
+
+// ═══════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+  document.getElementById('page-' + name).classList.add('active')
+  document.querySelectorAll('nav a, .mobile-nav a').forEach(a => a.classList.remove('active'))
+  if (el) {
+    // highlight both sidebar and mobile nav
+    document.querySelectorAll('nav a, .mobile-nav a').forEach(a => {
+      if (a.textContent.trim().toLowerCase().startsWith(name === 'dashboard' ? 'home' : name) ||
+          a.onclick?.toString().includes("'"+name+"'")) {
+        a.classList.add('active')
+      }
+    })
+    el.classList.add('active')
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════════════════
+function applyTheme(t) {
+  STATE.theme = t
+  document.body.classList.toggle('dark', t === 'dark')
+  localStorage.setItem('hd-theme', t)
+  document.getElementById('theme-light').classList.toggle('active', t === 'light')
+  document.getElementById('theme-dark').classList.toggle('active', t === 'dark')
+}
+function toggleTheme() {
+  applyTheme(STATE.theme === 'dark' ? 'light' : 'dark')
+}
+function setTheme(t) { applyTheme(t) }
+
+// ═══════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════
+function setAutoRefresh(v) {
+  STATE.autoRefresh = v
+  localStorage.setItem('hd-auto', v)
+  document.getElementById('auto-on').classList.toggle('active', v)
+  document.getElementById('auto-off').classList.toggle('active', !v)
+  startAutoRefresh()
+}
+function saveSettings() {
+  STATE.endpoint = document.getElementById('settings-endpoint').value.trim()
+  STATE.uid      = document.getElementById('settings-uid').value.trim()
+  localStorage.setItem('hd-endpoint', STATE.endpoint)
+  localStorage.setItem('hd-uid', STATE.uid)
+  document.getElementById('cfg-endpoint').value = STATE.endpoint
+  document.getElementById('cfg-uid').value = STATE.uid
+  loadData(true)
+}
+function startAutoRefresh() {
+  if (autoTimer) clearInterval(autoTimer)
+  if (STATE.autoRefresh) {
+    autoTimer = setInterval(() => loadData(false), 60000)
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// DATA LOADING
+// ═══════════════════════════════════════════════════════
+async function loadData(manual = false) {
+  const endpoint = document.getElementById('cfg-endpoint').value.trim() || STATE.endpoint
+  const uid      = document.getElementById('cfg-uid').value.trim() || STATE.uid
+
+  STATE.endpoint = endpoint
+  STATE.uid      = uid
+  localStorage.setItem('hd-endpoint', endpoint)
+  localStorage.setItem('hd-uid', uid)
+
+  if (!endpoint) {
+    setStatus('error', 'Enter endpoint URL')
+    return
+  }
+
+  setLoading(true)
+  setStatus('', 'Loading...')
+
+  try {
+    const url = uid ? `${endpoint}?user_id=${encodeURIComponent(uid)}` : endpoint
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const json = await res.json()
+    if (!json.rows || !Array.isArray(json.rows)) throw new Error('Expected { rows: [...] }')
+
+    STATE.data = processData(json.rows)
+    STATE.lastUpdated = new Date()
+    render()
+    setStatus('live', `Loaded ${json.rows.length} rows`)
+    document.getElementById('last-updated').textContent =
+      'Updated ' + STATE.lastUpdated.toLocaleTimeString()
+    document.getElementById('settings-sync').textContent =
+      STATE.lastUpdated.toLocaleTimeString()
+  } catch(e) {
+    setStatus('error', 'Error: ' + e.message)
+    console.error(e)
+  } finally {
+    setLoading(false)
+  }
+}
+
+function setLoading(v) {
+  document.getElementById('loading-bar').style.display = v ? 'block' : 'none'
+  document.getElementById('refresh-btn').disabled = v
+  document.getElementById('refresh-btn').textContent = v ? 'Loading...' : 'Refresh'
+}
+
+function setStatus(type, text) {
+  const dot = document.getElementById('status-dot')
+  dot.className = 'status-dot' + (type ? ' ' + type : '')
+  document.getElementById('status-text').textContent = text
+}
+
+// ═══════════════════════════════════════════════════════
+// DATA PROCESSING
+// ═══════════════════════════════════════════════════════
+function cleanName(n) {
+  return n.replace(/^[\u{1F300}-\u{1FFFF}\u2600-\u26FF\u2700-\u27BF\s□■●○◆▪▸►]+/gu, '').trim()
+}
+
+function normalizeStatus(s) {
+  s = (s || '').toLowerCase().trim()
+  if (s === 'done' || s === 'completed') return 'completed'
+  if (s === 'skip' || s === 'skipped')  return 'skipped'
+  if (s === 'pending') return 'pending'
+  return 'missed'
+}
+
+function processData(rows) {
+  // Extract unique habits
+  const habitSet = new Map()
+  rows.forEach(r => {
+    const name = cleanName(r.habit_name || '')
+    if (name && !habitSet.has(name.toLowerCase())) {
+      habitSet.set(name.toLowerCase(), {
+        id: 'h-' + name.toLowerCase().replace(/\s+/g, '-'),
+        name, category: r.category || 'General',
+        color: habitColors[habitSet.size % habitColors.length],
+      })
+    }
+  })
+  const habits = Array.from(habitSet.values())
+
+  // Build entries
+  const today = fmtDate(new Date())
+  const entries = rows.map((r, i) => ({
+    id: 'e' + i,
+    habitName: cleanName(r.habit_name || ''),
+    habitId: 'h-' + cleanName(r.habit_name || '').toLowerCase().replace(/\s+/g, '-'),
+    date: r.date || '',
+    time: r.time || '',
+    status: normalizeStatus(r.status),
+    weekday: r.weekday || '',
+    category: r.category || 'General',
+  })).filter(e => e.habitName && e.date)
+
+  // Today entries
+  const todayEntries = entries.filter(e => e.date === today)
+
+  // Daily summaries
+  const byDate = {}
+  entries.filter(e => e.status !== 'pending').forEach(e => {
+    if (!byDate[e.date]) byDate[e.date] = { completed:0, skipped:0, missed:0, total:0 }
+    byDate[e.date][e.status]++
+    byDate[e.date].total++
+  })
+  const dailies = Object.entries(byDate).map(([date, d]) => ({
+    date, ...d, rate: d.total ? d.completed / d.total : 0
+  })).sort((a,b) => a.date.localeCompare(b.date))
+
+  // Weekly summaries
+  const byWeek = {}
+  dailies.forEach(d => {
+    const wk = getMonday(d.date)
+    if (!byWeek[wk]) byWeek[wk] = { completed:0, skipped:0, missed:0, total:0, n:0 }
+    byWeek[wk].completed += d.completed
+    byWeek[wk].skipped   += d.skipped
+    byWeek[wk].missed    += d.missed
+    byWeek[wk].total     += d.total
+    byWeek[wk].n++
+  })
+  const weeklies = Object.entries(byWeek).sort((a,b) => a[0].localeCompare(b[0]))
+    .map(([wk, d], i) => ({ weekStart:wk, weekLabel:`W${i+1}`, ...d, rate: d.total ? d.completed/d.total : 0 }))
+
+  // Monthly summaries
+  const byMonth = {}
+  dailies.forEach(d => {
+    const m = d.date.slice(0,7)
+    if (!byMonth[m]) byMonth[m] = { completed:0, total:0 }
+    byMonth[m].completed += d.completed
+    byMonth[m].total     += d.total
+  })
+  const monthlies = Object.entries(byMonth).sort((a,b) => a[0].localeCompare(b[0]))
+    .map(([m, d]) => ({ month:m, label: monthLabel(m), ...d, rate: d.total ? d.completed/d.total : 0 }))
+
+  // Per-habit metrics
+  const habitMetrics = habits.map(h => {
+    const hEntries = entries.filter(e => e.habitId === h.id && e.status !== 'pending')
+    const completed = hEntries.filter(e => e.status === 'completed').length
+    const skipped   = hEntries.filter(e => e.status === 'skipped').length
+    const missed    = hEntries.filter(e => e.status === 'missed').length
+    const total     = hEntries.length
+    // Streak
+    const sorted = [...hEntries].sort((a,b) => b.date.localeCompare(a.date))
+    let cur = 0, best = 0, tmp = 0
+    ;[...hEntries].sort((a,b) => a.date.localeCompare(b.date)).forEach(e => {
+      if (e.status === 'completed') { tmp++; if(tmp>best) best=tmp }
+      else tmp = 0
+    })
+    for (const e of sorted) { if(e.status==='completed') cur++; else break }
+    return { habit:h, completed, skipped, missed, total,
+      completionRate: total ? completed/total : 0,
+      consistency: (completed+missed) ? completed/(completed+missed) : 0,
+      currentStreak: cur, bestStreak: best }
+  })
+
+  // Global streak
+  const sortedD = [...dailies].sort((a,b) => b.date.localeCompare(a.date))
+  let globalCur = 0, globalBest = 0, tmp2 = 0
+  dailies.forEach(d => { if(d.rate>=0.5){tmp2++;if(tmp2>globalBest)globalBest=tmp2}else tmp2=0 })
+  for (const d of sortedD) { if(d.rate>=0.5) globalCur++; else break }
+
+  // Total completions
+  const totalCompleted = entries.filter(e => e.status === 'completed').length
+  const discipline     = habitMetrics.reduce((s,m) => s + m.consistency, 0) / (habitMetrics.length || 1)
+
+  return {
+    habits, entries, todayEntries, dailies, weeklies, monthlies,
+    habitMetrics, globalCur, globalBest, totalCompleted, discipline
+  }
+}
+
+const habitColors = [
+  '#3b82f6','#10b981','#f59e0b','#06b6d4','#8b5cf6',
+  '#ef4444','#ec4899','#14b8a6','#f97316','#6366f1'
+]
+
+function fmtDate(d) {
+  if (typeof d === 'string') return d
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0')
+}
+
+function getMonday(dateStr) {
+  const d = new Date(dateStr)
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  return fmtDate(new Date(d.setDate(diff)))
+}
+
+function monthLabel(m) {
+  const [y, mo] = m.split('-')
+  return new Date(+y, +mo-1, 1).toLocaleString('en', {month:'short', year:'numeric'})
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════
+function render() {
+  const D = STATE.data
+  if (!D) return
+
+  renderKPI(D)
+  renderToday(D)
+  renderStreak(D)
+  renderHeatmap(D)
+  renderDailyChart(D)
+  renderWeeklyChart(D)
+  renderHabitsPage(D)
+  renderProgressPage(D)
+  renderHistory(D)
+}
+
+// ── KPI ──────────────────────────────────────────────────
+function renderKPI(D) {
+  const today = fmtDate(new Date())
+  const todayDone = D.todayEntries.filter(e => e.status === 'completed').length
+  const todaySkip = D.todayEntries.filter(e => e.status === 'skipped').length
+  const total = D.habits.length
+  const weekRate = D.weeklies.at(-1)?.rate ?? 0
+  const monthRate = D.monthlies.at(-1)?.rate ?? 0
+
+  const kpis = [
+    { label:'Total Habits',     value: D.habits.length,            sub:'tracked',            cls:'' },
+    { label:'Done Today',       value: `${todayDone}/${total}`,    sub: pct(total?todayDone/total:0), cls: rateClass(total?todayDone/total:0) },
+    { label:'Skipped Today',    value: todaySkip,                   sub:'habits',             cls: todaySkip>0?'warning':'' },
+    { label:'Week Rate',        value: pct(weekRate),               sub:'this week',          cls: rateClass(weekRate) },
+    { label:'Month Rate',       value: pct(monthRate),              sub:'this month',         cls: rateClass(monthRate) },
+    { label:'Current Streak',   value: `${D.globalCur}d`,           sub:'active days',        cls: D.globalCur>=7?'success':'' },
+    { label:'Best Streak',      value: `${D.globalBest}d`,          sub:'personal record',    cls:'' },
+    { label:'Total Done',       value: D.totalCompleted,            sub:'all time',           cls:'' },
+    { label:'Discipline',       value: pct(D.discipline),           sub:'done/(done+missed)', cls: rateClass(D.discipline) },
+  ]
+
+  document.getElementById('kpi-grid').innerHTML = kpis.map(k => `
+    <div class="kpi ${k.cls}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value ${k.cls ? 'text-'+k.cls : ''}">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>
+  `).join('')
+}
+
+function pct(v, d=0) { return (v*100).toFixed(d) + '%' }
+function rateClass(v) { return v>=0.75?'success':v>=0.5?'warning':'danger' }
+
+// ── Today ─────────────────────────────────────────────────
+function renderToday(D) {
+  const today = fmtDate(new Date())
+  const entryMap = new Map(D.todayEntries.map(e => [e.habitId, e]))
+  const done = D.todayEntries.filter(e => e.status === 'completed').length
+  const total = D.habits.length
+  const p = total ? Math.round(done/total*100) : 0
+
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+      <span style="font-size:22px;font-weight:800">${done}<span style="font-size:14px;font-weight:400;color:var(--muted)"> / ${total}</span></span>
+      <span style="font-size:13px;font-weight:600;color:var(--muted)">${p}%</span>
+    </div>
+    <div class="pbar-track"><div class="pbar-fill" style="width:${p}%"></div></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">${total-done} remaining</div>
+  `
+  D.habits.forEach(h => {
+    const e = entryMap.get(h.id)
+    const status = e?.status ?? 'pending'
+    html += `
+      <div class="habit-item ${status === 'completed' ? 'done' : status === 'skipped' ? 'skip' : status === 'missed' ? 'missed' : ''}">
+        <div>
+          <div class="habit-name ${status==='completed'?'striked':''}">${h.name}</div>
+          <div class="habit-cat">${h.category}</div>
+        </div>
+        <span class="badge badge-${status === 'completed' ? 'done' : status}">${status === 'completed' ? 'Done' : status === 'skipped' ? 'Skip' : status === 'missed' ? 'Missed' : 'Pending'}</span>
+      </div>
+    `
+  })
+  document.getElementById('today-block').innerHTML = html
+}
+
+// ── Streak ────────────────────────────────────────────────
+function renderStreak(D) {
+  let html = `
+    <div class="streak-boxes">
+      <div class="streak-box">
+        <div class="lbl">Current</div>
+        <div class="num text-success">${D.globalCur}<span style="font-size:16px;font-weight:400;color:var(--muted)">d</span></div>
+      </div>
+      <div class="streak-box">
+        <div class="lbl">Best</div>
+        <div class="num">${D.globalBest}<span style="font-size:16px;font-weight:400;color:var(--muted)">d</span></div>
+      </div>
+    </div>
+  `
+  const top = [...D.habitMetrics].sort((a,b) => b.currentStreak-a.currentStreak).slice(0,5)
+  top.forEach(m => {
+    html += `
+      <div class="habit-streak-row">
+        <div class="hs-dot" style="background:${m.habit.color}"></div>
+        <div style="flex:1">
+          <div class="hs-name">${m.habit.name}</div>
+          <div class="hs-best">Best: ${m.bestStreak}d</div>
+        </div>
+        <div class="hs-cur">${m.currentStreak}d</div>
+      </div>
+    `
+  })
+  document.getElementById('streak-block').innerHTML = html
+}
+
+// ── Heatmap ───────────────────────────────────────────────
+function renderHeatmap(D) {
+  const rateMap = new Map(D.dailies.map(d => [d.date, d.rate]))
+  const today = new Date()
+  const cells = 52 * 7
+  const days = []
+  for (let i = cells-1; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    days.push(d)
+  }
+
+  // Group into weeks
+  const dow = ['','Mon','','Wed','','Fri','']
+  let html = `<div class="heatmap-grid-wrap"><div class="heatmap-dow">`
+  html += `<span style="height:16px;display:block"></span>` // month label space
+  dow.forEach(d => { html += `<span>${d}</span>` })
+  html += `</div><div style="display:flex;flex-direction:column;gap:0"><div style="display:flex;gap:3px;margin-bottom:3px;height:16px;font-size:9px;color:var(--muted)">`
+
+  // Month labels
+  const weeks = []
+  for (let w = 0; w < 52; w++) weeks.push(days.slice(w*7, w*7+7))
+  weeks.forEach(week => {
+    const first = week[0]
+    if (first && first.getDate() <= 7) {
+      html += `<div style="width:11px;white-space:nowrap">${first.toLocaleString('en',{month:'short'})}</div>`
+    } else {
+      html += `<div style="width:11px"></div>`
+    }
+  })
+  html += `</div><div class="heatmap-cols">`
+
+  weeks.forEach(week => {
+    html += `<div class="hm-col">`
+    week.forEach(d => {
+      const ds = fmtDate(d)
+      const rate = rateMap.get(ds)
+      const cls = rate === undefined ? 'hm-0'
+        : rate === 0 ? 'hm-0'
+        : rate < 0.25 ? 'hm-1'
+        : rate < 0.5  ? 'hm-2'
+        : rate < 0.75 ? 'hm-3' : 'hm-4'
+      const tip = `${d.toDateString()}: ${rate !== undefined ? Math.round(rate*100)+'%' : 'no data'}`
+      html += `<div class="hm-cell ${cls}" title="${tip}"></div>`
+    })
+    html += `</div>`
+  })
+
+  html += `</div></div></div>`
+  html += `<div class="hm-legend">Less <div class="hm-cell hm-0"></div><div class="hm-cell hm-1"></div><div class="hm-cell hm-2"></div><div class="hm-cell hm-3"></div><div class="hm-cell hm-4"></div> More</div>`
+  document.getElementById('heatmap').innerHTML = html
+}
+
+// ── Charts ────────────────────────────────────────────────
+function destroyChart(id) { if(charts[id]){charts[id].destroy();delete charts[id]} }
+
+function chartDefaults() {
+  return {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: { legend:{ display:false } },
+    scales: {
+      x: { grid:{color:'rgba(128,128,128,.1)'}, ticks:{color:'#888',font:{size:10}} },
+      y: { grid:{color:'rgba(128,128,128,.1)'}, ticks:{color:'#888',font:{size:10}} },
+    }
+  }
+}
+
+function renderDailyChart(D) {
+  destroyChart('daily')
+  const data = D.dailies.slice(-30)
+  charts['daily'] = new Chart(document.getElementById('chart-daily'), {
+    type:'line',
+    data:{
+      labels: data.map(d => d.date.slice(5)),
+      datasets:[
+        { label:'Done', data:data.map(d=>d.completed), borderColor:'#16a34a', backgroundColor:'rgba(22,163,74,.1)', fill:true, tension:.3, pointRadius:2, borderWidth:2 },
+        { label:'Skip', data:data.map(d=>d.skipped),   borderColor:'#d97706', backgroundColor:'rgba(217,119,6,.05)',  fill:true, tension:.3, pointRadius:2, borderWidth:1.5 },
+      ]
+    },
+    options: { ...chartDefaults(), plugins:{legend:{display:true,labels:{font:{size:11},boxWidth:12}}} }
+  })
+}
+
+function renderWeeklyChart(D) {
+  destroyChart('weekly')
+  const data = D.weeklies.slice(-12)
+  charts['weekly'] = new Chart(document.getElementById('chart-weekly'), {
+    type:'bar',
+    data:{
+      labels: data.map(d=>d.weekLabel),
+      datasets:[{
+        label:'Completed',
+        data: data.map(d=>d.completed),
+        backgroundColor: data.map(d => d.rate>=0.75?'rgba(22,163,74,.8)':d.rate>=0.5?'rgba(217,119,6,.8)':'rgba(220,38,38,.8)'),
+        borderRadius:6,
+      }]
+    },
+    options: chartDefaults()
+  })
+}
+
+function renderHabitRateChart(D) {
+  destroyChart('habit-rate')
+  const sorted = [...D.habitMetrics].sort((a,b)=>b.completionRate-a.completionRate)
+  charts['habit-rate'] = new Chart(document.getElementById('chart-habit-rate'), {
+    type:'bar',
+    data:{
+      labels: sorted.map(m=>m.habit.name),
+      datasets:[{
+        data: sorted.map(m=>Math.round(m.completionRate*100)),
+        backgroundColor: sorted.map(m=>m.habit.color+'cc'),
+        borderRadius:6,
+        barThickness:18,
+      }]
+    },
+    options:{
+      indexAxis:'y',
+      ...chartDefaults(),
+      scales:{
+        x:{...chartDefaults().scales.x, max:100, ticks:{...chartDefaults().scales.x.ticks, callback:v=>v+'%'}},
+        y:{...chartDefaults().scales.y},
+      }
+    }
+  })
+}
+
+function renderWeekdayChart(D) {
+  destroyChart('weekday')
+  const byDow = Array.from({length:7},()=>({c:0,t:0}))
+  D.dailies.forEach(d => {
+    const dow = new Date(d.date).getDay()
+    byDow[dow].c += d.completed
+    byDow[dow].t += d.total
+  })
+  const labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+  charts['weekday'] = new Chart(document.getElementById('chart-weekday'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        data: byDow.map(d=>d.t?Math.round(d.c/d.t*100):0),
+        backgroundColor:'rgba(59,130,246,.7)',
+        borderRadius:6,
+        barThickness:22,
+      }]
+    },
+    options:{
+      ...chartDefaults(),
+      scales:{
+        x:{...chartDefaults().scales.x},
+        y:{...chartDefaults().scales.y, max:100, ticks:{callback:v=>v+'%',color:'#888',font:{size:10}}},
+      }
+    }
+  })
+}
+
+function renderMonthlyChart(D) {
+  destroyChart('monthly')
+  charts['monthly'] = new Chart(document.getElementById('chart-monthly'), {
+    type:'line',
+    data:{
+      labels: D.monthlies.map(m=>m.label),
+      datasets:[{
+        data: D.monthlies.map(m=>Math.round(m.rate*100)),
+        borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,.1)',
+        fill:true, tension:.3, pointRadius:4, borderWidth:2.5,
+      }]
+    },
+    options:{
+      ...chartDefaults(),
+      scales:{
+        x:{...chartDefaults().scales.x},
+        y:{...chartDefaults().scales.y, max:100, ticks:{callback:v=>v+'%',color:'#888',font:{size:10}}},
+      }
+    }
+  })
+}
+
+// ── Habits page ───────────────────────────────────────────
+function renderHabitsPage(D) {
+  document.getElementById('habits-sub').textContent = `${D.habits.length} habits tracked`
+  renderHabitRateChart(D)
+
+  const html = D.habitMetrics
+    .sort((a,b)=>b.completionRate-a.completionRate)
+    .map(m => `
+      <div class="card mb16">
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="width:4px;align-self:stretch;border-radius:4px;background:${m.habit.color};flex-shrink:0"></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+              <span style="font-size:15px;font-weight:700">${m.habit.name}</span>
+              <span style="font-size:11px;padding:2px 8px;border-radius:6px;background:var(--bg);color:var(--muted);font-weight:600">${m.habit.category}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px 16px;margin-top:10px">
+              ${[
+                ['All-time', pct(m.completionRate), rateClass(m.completionRate)],
+                ['Consistency', pct(m.consistency), ''],
+                ['Current streak', m.currentStreak+'d', m.currentStreak>=7?'success':''],
+                ['Best streak', m.bestStreak+'d', ''],
+                ['Completed', m.completed, ''],
+                ['Skipped', m.skipped, m.skipped>0?'warning':''],
+                ['Missed', m.missed, m.missed>0?'danger':''],
+                ['Total', m.total, ''],
+              ].map(([l,v,c])=>`
+                <div>
+                  <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">${l}</div>
+                  <div style="font-size:14px;font-weight:700;color:${c?'var(--'+c+')':'var(--text)'}">${v}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:22px;font-weight:800;color:var(--${rateClass(m.completionRate)})">${pct(m.completionRate)}</div>
+            <div style="font-size:10px;color:var(--muted)">completion</div>
+          </div>
+        </div>
+        <div class="pbar-track" style="margin-top:14px">
+          <div class="pbar-fill" style="width:${pct(m.completionRate)};background:${m.habit.color}"></div>
+        </div>
+      </div>
+    `).join('')
+  document.getElementById('habits-list').innerHTML = html
+}
+
+// ── Progress page ─────────────────────────────────────────
+function renderProgressPage(D) {
+  const currW = D.weeklies.at(-1)
+  const prevW = D.weeklies.at(-2)
+  const delta = currW && prevW ? currW.rate - prevW.rate : null
+
+  document.getElementById('progress-comparison').innerHTML = [
+    { label:'This Week',  value:pct(currW?.rate??0), sub:currW?.weekLabel??'',  cls:'' },
+    { label:'Last Week',  value:pct(prevW?.rate??0), sub:prevW?.weekLabel??'',  cls:'' },
+    { label:'Change',     value:delta!==null?(delta>=0?'+':'')+pct(delta):'—',  sub:'vs last week', cls:delta===null?'':delta>=0?'success':'danger' },
+  ].map(k=>`
+    <div class="kpi">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value ${k.cls?'text-'+k.cls:''}">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>
+  `).join('')
+
+  const sorted = [...D.habitMetrics].sort((a,b)=>b.completionRate-a.completionRate)
+  const strong = sorted[0], weak = sorted.at(-1)
+  document.getElementById('strong-weak').innerHTML = `
+    <div style="margin-bottom:16px">
+      <div class="kpi-label">Strongest</div>
+      <div style="font-size:15px;font-weight:700">${strong?.habit.name??'—'}</div>
+      <div style="font-size:22px;font-weight:800;color:var(--success)">${strong?pct(strong.completionRate):'—'}</div>
+    </div>
+    <div>
+      <div class="kpi-label">Weakest</div>
+      <div style="font-size:15px;font-weight:700">${weak?.habit.name??'—'}</div>
+      <div style="font-size:22px;font-weight:800;color:var(--danger)">${weak?pct(weak.completionRate):'—'}</div>
+    </div>
+  `
+
+  renderWeekdayChart(D)
+  renderMonthlyChart(D)
+}
+
+// ── History ───────────────────────────────────────────────
+function renderHistory(D) {
+  const entries = [...D.entries]
+    .filter(e => e.status !== 'pending')
+    .sort((a,b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time))
+    .slice(0, 300)
+
+  document.getElementById('history-sub').textContent = `${entries.length} entries`
+  document.getElementById('history-body').innerHTML = entries.map(e => `
+    <tr>
+      <td class="font-mono" style="font-size:12px;color:var(--muted)">${e.date}</td>
+      <td style="font-weight:500">${e.habitName}</td>
+      <td><span class="badge badge-${e.status === 'completed' ? 'done' : e.status}">${e.status === 'completed' ? 'Done' : e.status === 'skipped' ? 'Skip' : 'Missed'}</span></td>
+      <td style="color:var(--muted);font-size:12px">${e.time || '—'}</td>
+      <td style="color:var(--muted);font-size:12px">${e.weekday || '—'}</td>
+    </tr>
+  `).join('')
+}
+</script>
+</body>
+</html>
