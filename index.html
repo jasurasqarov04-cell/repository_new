@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0"/>
 <title>Habit Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
@@ -17,7 +17,7 @@
   --success-bg:#052e16;--success-mid:#166534;--warning-bg:#1c1107;--danger-bg:#1c0505;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 
 /* Shell */
 .shell{display:flex;height:100vh;overflow:hidden;}
@@ -54,7 +54,7 @@ header{height:56px;border-bottom:1px solid var(--border);background:var(--surfac
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
 
 /* ══ BIG PROGRESS RING ══ */
-.hero-card{background:linear-gradient(135deg,#1e3a5f 0%,#0f1f3d 100%);border:none;border-radius:20px;padding:28px 32px;margin-bottom:20px;display:flex;align-items:center;gap:32px;position:relative;overflow:hidden;}
+.hero-card{background:linear-gradient(135deg,#1e3a5f 0%,#0f1f3d 100%);border:none;border-radius:20px;padding:28px 32px;margin-bottom:20px;display:flex;align-items:center;gap:32px;position:relative;overflow:hidden;min-width:0;}
 .hero-card::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(59,130,246,.08);}
 .ring-wrap{position:relative;flex-shrink:0;}
 .ring-wrap svg{transform:rotate(-90deg);}
@@ -177,19 +177,97 @@ tr:hover td{background:var(--bg);}
 .page-hdr h1{font-size:23px;font-weight:800;letter-spacing:-.03em;}
 .page-hdr p{font-size:13px;color:var(--muted);margin-top:4px;}
 
+/* Filter bar */
+.filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;}
+.filter-bar label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-right:2px;}
+.filter-input{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--text);outline:none;font-family:inherit;}
+.filter-input:focus{border-color:var(--accent);}
+.filter-sep{color:var(--border);font-size:16px;}
+.filter-btn{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.filter-btn:hover{background:var(--bg);}
+.filter-btn.active{background:var(--accent);color:#fff;border-color:transparent;}
+.filter-reset{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;border:none;background:none;color:var(--danger);cursor:pointer;}
+@media(max-width:768px){
+  .filter-bar{gap:6px;padding:8px 10px;}
+  .filter-input{font-size:11px;padding:5px 8px;}
+  .filter-btn{font-size:11px;padding:5px 10px;}
+}
+
 /* Mobile */
 .mob-nav{display:none;}
 @media(max-width:768px){
   .sidebar{display:none;}
-  .mob-nav{display:flex;position:fixed;bottom:0;left:0;right:0;height:60px;background:var(--surface);border-top:1px solid var(--border);z-index:50;}
-  .mob-nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:var(--muted);text-decoration:none;cursor:pointer;gap:3px;}
+  .mob-nav{
+    display:flex;position:fixed;bottom:0;left:0;right:0;
+    height:64px;background:var(--surface);
+    border-top:1px solid var(--border);z-index:100;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .mob-nav a{
+    flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;font-size:10px;font-weight:600;
+    color:var(--muted);text-decoration:none;cursor:pointer;gap:4px;
+    padding:8px 4px;
+  }
   .mob-nav a.active{color:var(--accent);}
   .mob-nav a .mdot{width:5px;height:5px;border-radius:50%;background:var(--accent);}
   .mob-nav a:not(.active) .mdot{display:none;}
-  .content{padding:16px;padding-bottom:80px;}
+  .mob-nav a .mlabel{font-size:9px;letter-spacing:.02em;}
+
+  .content{padding:12px;padding-bottom:80px;}
+  header{padding:0 12px;height:48px;}
+
   .grid2,.grid3,.grid4{grid-template-columns:1fr;}
-  .hero-card{flex-direction:column;text-align:center;}
-  .hero-stats{justify-content:center;}
+  .grid2{gap:10px;}.grid3{gap:10px;}.grid4{gap:8px;}
+
+  /* Hero card mobile */
+  .hero-card{flex-direction:column;text-align:center;padding:20px 16px;gap:20px;border-radius:16px;}
+  .hero-stats{justify-content:center;gap:16px;}
+  .hero-stat .num{font-size:20px;}
+  .hero-title{font-size:18px;}
+  .ring-wrap svg{width:120px;height:120px;}
+  .ring-pct{font-size:24px;}
+
+  /* KPI grid 2 columns on mobile */
+  #kpi-grid{grid-template-columns:1fr 1fr !important;}
+
+  /* Cards */
+  .card{padding:14px;}
+  .plan-card{padding:14px 16px;}
+
+  /* Config bar */
+  .config-bar{padding:12px;}
+  .cfg-group{min-width:100%;}
+
+  /* Page header */
+  .page-hdr h1{font-size:20px;}
+
+  /* Tables — horizontal scroll */
+  .card{overflow-x:auto;}
+  table{min-width:400px;}
+
+  /* Habit rows */
+  .habit-row{padding:8px 10px;}
+
+  /* Settings */
+  .s-row{flex-direction:column;align-items:flex-start;gap:8px;}
+  .s-input{width:100% !important;}
+  .tog-wrap{flex-wrap:wrap;}
+}
+
+/* Very small screens */
+@media(max-width:380px){
+  #kpi-grid{grid-template-columns:1fr !important;}
+  .hero-stats{gap:12px;}
+}
+
+/* Telegram Mini App safe area */
+@supports(padding:max(0px)){
+  .mob-nav{
+    padding-bottom:max(env(safe-area-inset-bottom), 8px);
+    height:calc(64px + env(safe-area-inset-bottom));
+  }
+  .content{padding-bottom:calc(80px + env(safe-area-inset-bottom));}
 }
 </style>
 </head>
@@ -231,8 +309,8 @@ tr:hover td{background:var(--bg);}
 
     <div class="content">
 
-      <!-- CONFIG -->
-      <div class="config-bar" id="cfg-bar">
+      <!-- CONFIG (hidden — use Settings page) -->
+      <div class="config-bar" id="cfg-bar" style="display:none">
         <div class="cfg-group" style="flex:2">
           <label>Apps Script Endpoint URL</label>
           <input id="cfg-ep" type="url" placeholder="https://script.google.com/macros/s/YOUR_ID/exec"/>
@@ -273,6 +351,14 @@ tr:hover td{background:var(--bg);}
         </div>
 
         <!-- KPIs -->
+        <!-- Filter bar -->
+        <div class="filter-bar" id="filter-bar">
+          <button class="filter-btn" onclick="setPreset('all',this)">All</button>
+          <button class="filter-btn active" onclick="setPreset('today',this)">Today</button>
+          <button class="filter-btn" onclick="setPreset('week',this)">Week</button>
+          <button class="filter-btn" onclick="setPreset('month',this)">Month</button>
+        </div>
+
         <div class="grid4 mb20" id="kpi-grid"></div>
 
         <div class="grid2">
@@ -386,11 +472,11 @@ tr:hover td{background:var(--bg);}
 </div>
 
 <nav class="mob-nav">
-  <a class="active" onclick="nav('dashboard',this)"><div class="mdot"></div>Home</a>
-  <a onclick="nav('plans',this)"><div class="mdot"></div>Plans</a>
-  <a onclick="nav('habits',this)"><div class="mdot"></div>Habits</a>
-  <a onclick="nav('progress',this)"><div class="mdot"></div>Progress</a>
-  <a onclick="nav('history',this)"><div class="mdot"></div>History</a>
+  <a class="active" onclick="nav('dashboard',this)"><div class="mdot"></div><span class="mlabel">Home</span></a>
+  <a onclick="nav('plans',this)"><div class="mdot"></div><span class="mlabel">Plans</span></a>
+  <a onclick="nav('habits',this)"><div class="mdot"></div><span class="mlabel">Habits</span></a>
+  <a onclick="nav('progress',this)"><div class="mdot"></div><span class="mlabel">Progress</span></a>
+  <a onclick="nav('history',this)"><div class="mdot"></div><span class="mlabel">History</span></a>
 </nav>
 
 <script>
@@ -419,6 +505,7 @@ window.onload = () => {
   qs('#s-ep').value    = S.ep
   qs('#s-uid').value   = S.uid
   setHeroDate()
+  setPreset('today', document.querySelector('.filter-btn.active'))
   if (S.ep) loadData(false)
   startAuto()
 }
@@ -660,9 +747,113 @@ function monthLabel(m) {
   return new Date(+y,+mo-1,1).toLocaleString('en',{month:'short',year:'numeric'})
 }
 
-// ══ RENDER ══
-function render() {
-  const D = S.data; if (!D) return
+// ══ FILTER STATE ══
+const F = { from: null, to: null }
+
+function fmtDateLocal(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')
+}
+
+function setPreset(preset, el) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'))
+  if (el) el.classList.add('active')
+
+  const today = new Date()
+  const d = new Date()
+
+  if (preset === 'today') {
+    F.from = fmtDateLocal(today)
+    F.to   = fmtDateLocal(today)
+  } else if (preset === 'week') {
+    d.setDate(d.getDate() - 6)
+    F.from = fmtDateLocal(d)
+    F.to   = fmtDateLocal(today)
+  } else if (preset === 'month') {
+    d.setDate(d.getDate() - 29)
+    F.from = fmtDateLocal(d)
+    F.to   = fmtDateLocal(today)
+  } else if (preset === '3month') {
+    d.setDate(d.getDate() - 89)
+    F.from = fmtDateLocal(d)
+    F.to   = fmtDateLocal(today)
+  } else {
+    F.from = null
+    F.to   = null
+  }
+
+  document.getElementById('f-from').value = F.from || ''
+  document.getElementById('f-to').value   = F.to   || ''
+  document.getElementById('f-reset').style.display = (F.from || F.to) ? 'block' : 'none'
+  if (S.data) renderWithFilter()
+}
+
+function applyFilter() {
+  F.from = document.getElementById('f-from').value || null
+  F.to   = document.getElementById('f-to').value   || null
+  document.getElementById('f-reset').style.display = (F.from || F.to) ? 'block' : 'none'
+  // deactivate preset buttons
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'))
+  if (S.data) renderWithFilter()
+}
+
+function resetFilter() {
+  F.from = null; F.to = null
+  document.getElementById('f-from').value = ''
+  document.getElementById('f-to').value   = ''
+  document.getElementById('f-reset').style.display = 'none'
+  document.querySelectorAll('.filter-btn').forEach((b,i) => { if(i===0) b.classList.add('active') })
+  if (S.data) renderWithFilter()
+}
+
+function filterData(D) {
+  if (!F.from && !F.to) return D
+  const from = F.from || '0000-00-00'
+  const to   = F.to   || '9999-99-99'
+
+  const entries = D.entries.filter(e => e.date >= from && e.date <= to)
+  const todayStr = fmtDate(new Date())
+  const todayEntries = entries.filter(e => e.date === todayStr)
+  const dailies  = D.dailies.filter(d => d.date >= from && d.date <= to)
+  const weeklies = D.weeklies.filter(w => w.weekStart >= from && w.weekStart <= to)
+  const monthlies= D.monthlies.filter(m => m.month >= from.slice(0,7) && m.month <= to.slice(0,7))
+
+  // Recalculate habit metrics for filtered range
+  const habitMetrics = D.habits.map(h => {
+    const hE = entries.filter(e => e.habitId === h.id && e.status !== 'pending')
+    const completed = hE.filter(e => e.status === 'completed').length
+    const skipped   = hE.filter(e => e.status === 'skipped').length
+    const missed    = hE.filter(e => e.status === 'missed').length
+    const total     = hE.length
+    let cur=0, best=0, tmp=0
+    ;[...hE].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>{
+      if(e.status==='completed'){tmp++;if(tmp>best)best=tmp}else tmp=0
+    })
+    ;[...hE].sort((a,b)=>b.date.localeCompare(a.date)).forEach(e=>{
+      if(e.status==='completed') cur++; else cur=Infinity
+    })
+    if (cur===Infinity) cur=0
+    const plan = D.plansMap[h.name.toLowerCase()]
+    const todayAmt = D.todayAmounts[h.name]||0
+    return { habit:h, completed, skipped, missed, total,
+      completionRate: total?completed/total:0,
+      currentStreak:cur, bestStreak:best,
+      plan: plan||null, todayAmt }
+  })
+
+  // Global streak for filtered
+  const sD = [...dailies].sort((a,b)=>b.date.localeCompare(a.date))
+  let gCur=0, gBest=0, tmp2=0
+  dailies.forEach(d=>{if(d.rate>=.5){tmp2++;if(tmp2>gBest)gBest=tmp2}else tmp2=0})
+  for(const d of sD){if(d.rate>=.5)gCur++;else break}
+
+  const totalDone = entries.filter(e=>e.status==='completed').length
+
+  return { ...D, entries, todayEntries, dailies, weeklies, monthlies,
+    habitMetrics, gCur, gBest, totalDone }
+}
+
+function renderWithFilter() {
+  const D = filterData(S.data)
   renderHero(D)
   renderKPI(D)
   renderToday(D)
@@ -675,6 +866,12 @@ function render() {
   renderHabitsPage(D)
   renderProgressPage(D)
   renderHistory(D)
+}
+
+// ══ RENDER ══
+function render() {
+  if (!S.data) return
+  renderWithFilter()
 }
 
 // ── HERO RING ────────────────────────────────────────────────
