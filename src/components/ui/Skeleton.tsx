@@ -1,6 +1,11 @@
 import { cn } from '@/lib/utils'
 
-export function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+interface SkeletonProps {
+  className?: string
+  style?: React.CSSProperties
+}
+
+export function Skeleton({ className, style }: SkeletonProps) {
   return <div className={cn('skeleton', className)} style={style} />
 }
 
