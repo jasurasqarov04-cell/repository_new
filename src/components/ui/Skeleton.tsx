@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 
-export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('skeleton', className)} />
+export function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return <div className={cn('skeleton', className)} style={style} />
 }
 
 export function KPISkeleton() {
@@ -22,7 +22,7 @@ export function ChartSkeleton({ height = 240 }: { height?: number }) {
   return (
     <div className="bg-surface-raised border border-border rounded-2xl p-5">
       <Skeleton className="h-3 w-28 mb-4" />
-      <Skeleton className={`w-full`} style={{ height }} />
+      <Skeleton className="w-full" style={{ height }} />
     </div>
   )
 }
