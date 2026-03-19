@@ -363,7 +363,7 @@ tr:hover td{background:var(--bg);}
             </svg>
             <div class="ring-text">
               <div class="ring-pct" id="ring-pct">0%</div>
-              <div class="ring-sub">today</div>
+              <div class="ring-sub">plan today</div>
             </div>
           </div>
           <div class="hero-info">
@@ -395,7 +395,7 @@ tr:hover td{background:var(--bg);}
             <div class="card-title">Today</div>
             <div id="today-block"></div>
           </div>
-          <!-- Plans today -->
+          <!-- Today -->
           <div class="card">
             <div class="card-title">Plan Progress Today</div>
             <div id="plans-today"></div>
@@ -960,23 +960,32 @@ function render() {
 
 // ── HERO RING ────────────────────────────────────────────────
 function renderHero(D) {
-  const today = fmtDate(new Date())
   const todayDone  = D.todayEntries.filter(e=>e.status==='completed').length
   const todayTotal = D.habits.length
-  const p = todayTotal ? Math.round(todayDone/todayTotal*100) : 0
 
-  // Update ring
-  const circ = 2 * Math.PI * 56 // r=56 → 351.86
-  const offset = circ - (p / 100 * circ)
-  const fill = qs('#ring-fill')
+  // Plan % Today — average across all active plans
+  let planPct = 0
+  if (D.plansToday.length) {
+    const sum = D.plansToday.reduce((s,p) => {
+      return s + (p.plan.target>0 ? Math.min(p.todayAmt/p.plan.target, 1) : 0)
+    }, 0)
+    planPct = Math.round(sum / D.plansToday.length * 100)
+  } else {
+    // No plans — fall back to habit completion
+    planPct = todayTotal ? Math.round(todayDone/todayTotal*100) : 0
+  }
+
+  const circ  = 2 * Math.PI * 56
+  const offset = circ - (planPct / 100 * circ)
+  const fill   = qs('#ring-fill')
   fill.style.strokeDashoffset = offset
-  fill.style.stroke = p>=75?'#4ade80':p>=50?'#fbbf24':'#f87171'
+  fill.style.stroke = planPct>=75?'#4ade80':planPct>=50?'#fbbf24':'#f87171'
 
-  qs('#ring-pct').textContent = p + '%'
-  qs('#hs-done').textContent = `${todayDone}/${todayTotal}`
+  qs('#ring-pct').textContent = planPct + '%'
+  qs('#hs-done').textContent  = `${todayDone}/${todayTotal}`
   qs('#hs-streak').textContent = D.gCur + 'd'
-  qs('#hs-plans').textContent = D.plansToday.length
-  qs('#hs-total').textContent = D.totalDone
+  qs('#hs-plans').textContent  = D.plansToday.length
+  qs('#hs-total').textContent  = D.totalDone
 }
 
 // ── KPI ──────────────────────────────────────────────────────
