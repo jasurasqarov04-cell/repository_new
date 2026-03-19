@@ -985,23 +985,25 @@ function renderKPI(D) {
   const todayDone = D.todayEntries.filter(e=>e.status==='completed').length
   const todaySkip = D.todayEntries.filter(e=>e.status==='skipped').length
   const total = D.habits.length
-  // Always use FULL data for week/month rates (ignore date filter)
-  const fullData = S.data
+  // Rates depend on active filter
   const todayStr = fmtDate(new Date())
+  const activeFrom = F.from || '0000-00-00'
+  const activeTo   = F.to   || todayStr
 
-  // Week rate: completed / (habits × 7 days)
-  const weekStart = (() => { const d=new Date(); d.setDate(d.getDate()-6); return fmtDate(d) })()
-  const weekEntries = fullData.entries.filter(e => e.date >= weekStart && e.date <= todayStr && e.status !== 'pending')
-  const weekDone = weekEntries.filter(e => e.status === 'completed').length
-  const weekPossible = fullData.habits.length * 7
-  const wR = weekPossible > 0 ? weekDone / weekPossible : 0
+  // Filter entries by active period, exclude pending
+  const periodEntries = D.entries.filter(e =>
+    e.date >= activeFrom && e.date <= activeTo && e.status !== 'pending'
+  )
+  const periodDone  = periodEntries.filter(e => e.status === 'completed').length
+  const periodTotal = periodEntries.length
+  // Rate = completed / total recorded (not habits × days)
+  const wR = periodTotal > 0 ? periodDone / periodTotal : 0
 
-  // Month rate: completed / (habits × 30 days)
-  const monthStart = (() => { const d=new Date(); d.setDate(d.getDate()-29); return fmtDate(d) })()
-  const monthEntries = fullData.entries.filter(e => e.date >= monthStart && e.date <= todayStr && e.status !== 'pending')
-  const monthDone = monthEntries.filter(e => e.status === 'completed').length
-  const monthPossible = fullData.habits.length * 30
-  const mR = monthPossible > 0 ? monthDone / monthPossible : 0
+  // Week label and month label based on filter
+  const wLabel = F.from
+    ? (F.from === F.to ? 'today' : F.from + ' — ' + (F.to || todayStr))
+    : 'all time'
+  const mR = wR  // same metric, shown twice with different labels
 
   // Plan completion today (average)
   let planPct = 0
@@ -1013,10 +1015,17 @@ function renderKPI(D) {
     planPct = Math.round(sum/D.plansToday.length*100)
   }
 
+  // Period label for KPI cards
+  const periodLabel = !F.from ? 'all time'
+    : F.from === F.to ? 'today'
+    : F.from === fmtDate(new Date(new Date().setDate(new Date().getDate()-6))) ? 'this week'
+    : F.from === fmtDate(new Date(new Date().setDate(new Date().getDate()-29))) ? 'this month'
+    : F.from + ' — ' + (F.to || todayStr)
+
   const kpis = [
     {l:'Habits Today',v:`${todayDone}/${total}`,s:pct(total?todayDone/total:0),c:rcls(total?todayDone/total:0)},
-    {l:'Week Rate',   v:pct(wR),  s:'this week',  c:rcls(wR)},
-    {l:'Month Rate',  v:pct(mR),  s:'this month', c:rcls(mR)},
+    {l:'Completion Rate', v:pct(wR), s:periodLabel, c:rcls(wR)},
+    {l:'Done / Recorded', v:`${periodDone}/${periodTotal}`, s:'in period', c:rcls(wR)},
     {l:'Plan % Today',v:planPct+'%',s:`${D.plansToday.length} active plans`,c:rcls(planPct/100)},
     {l:'Current Streak',v:D.gCur+'d',s:'active days',c:D.gCur>=7?'g':''},
     {l:'Best Streak', v:D.gBest+'d',s:'record',c:''},
