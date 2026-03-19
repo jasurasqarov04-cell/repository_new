@@ -584,7 +584,14 @@ window.onload = () => {
   startAuto()
 }
 
-function qs(s) { return document.querySelector(s) }
+function qs(s) {
+  const el = document.querySelector(s)
+  if (!el) {
+    // Return a dummy object to prevent null errors
+    return { textContent: '', innerHTML: '', value: '', style: {}, classList: { toggle: ()=>{}, add: ()=>{}, remove: ()=>{} }, disabled: false }
+  }
+  return el
+}
 
 function setHeroDate() {
   const d = new Date()
