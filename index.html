@@ -987,8 +987,21 @@ function renderKPI(D) {
   const total = D.habits.length
   // Always use FULL data for week/month rates (ignore date filter)
   const fullData = S.data
-  const wR = fullData.weeklies.at(-1)?.rate??0
-  const mR = fullData.monthlies.at(-1)?.rate??0
+  const todayStr = fmtDate(new Date())
+
+  // Week rate: completed / (habits × 7 days)
+  const weekStart = (() => { const d=new Date(); d.setDate(d.getDate()-6); return fmtDate(d) })()
+  const weekEntries = fullData.entries.filter(e => e.date >= weekStart && e.date <= todayStr && e.status !== 'pending')
+  const weekDone = weekEntries.filter(e => e.status === 'completed').length
+  const weekPossible = fullData.habits.length * 7
+  const wR = weekPossible > 0 ? weekDone / weekPossible : 0
+
+  // Month rate: completed / (habits × 30 days)
+  const monthStart = (() => { const d=new Date(); d.setDate(d.getDate()-29); return fmtDate(d) })()
+  const monthEntries = fullData.entries.filter(e => e.date >= monthStart && e.date <= todayStr && e.status !== 'pending')
+  const monthDone = monthEntries.filter(e => e.status === 'completed').length
+  const monthPossible = fullData.habits.length * 30
+  const mR = monthPossible > 0 ? monthDone / monthPossible : 0
 
   // Plan completion today (average)
   let planPct = 0
