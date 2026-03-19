@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0"/>
 <title>Habit Dashboard</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
@@ -15,6 +16,14 @@
 .dark{
   --bg:#0d1117;--surface:#161b27;--border:#1e2840;--text:#e8ecf4;--muted:#7a8aaa;
   --success-bg:#052e16;--success-mid:#166534;--warning-bg:#1c1107;--danger-bg:#1c0505;
+}
+/* Telegram Mini App theme override */
+.tg-app {
+  --bg: var(--tg-theme-bg-color, #f4f6fb);
+  --surface: var(--tg-theme-secondary-bg-color, #fff);
+  --text: var(--tg-theme-text-color, #0f1117);
+  --muted: var(--tg-theme-hint-color, #6b7280);
+  --accent: var(--tg-theme-button-color, #3b82f6);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
@@ -176,6 +185,25 @@ tr:hover td{background:var(--bg);}
 .page-hdr{margin-bottom:20px;}
 .page-hdr h1{font-size:23px;font-weight:800;letter-spacing:-.03em;}
 .page-hdr p{font-size:13px;color:var(--muted);margin-top:4px;}
+
+/* Category cards */
+.cat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:14px;}
+.cat-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.cat-name{font-size:16px;font-weight:700;}
+.cat-badge{font-size:12px;font-weight:700;padding:3px 10px;border-radius:8px;}
+.cat-badge.good{background:var(--success-bg);color:var(--success);}
+.cat-badge.warn{background:var(--warning-bg);color:var(--warning);}
+.cat-badge.bad{background:var(--danger-bg);color:var(--danger);}
+.cat-bar-wrap{position:relative;height:12px;background:var(--bg);border-radius:7px;overflow:hidden;margin-bottom:6px;border:1px solid var(--border);}
+.cat-bar-actual{height:100%;border-radius:7px;transition:width 1s;}
+.cat-bar-target{position:absolute;top:0;bottom:0;width:2px;background:rgba(0,0,0,.3);}
+.cat-numbers{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:12px;}
+.cat-habits{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;}
+.cat-habit-item{background:var(--bg);border-radius:8px;padding:8px 10px;}
+.cat-habit-name{font-size:12px;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cat-habit-bar{height:4px;border-radius:3px;background:var(--border);overflow:hidden;}
+.cat-habit-fill{height:100%;border-radius:3px;}
+.cat-habit-pct{font-size:10px;color:var(--muted);margin-top:3px;}
 
 /* Filter bar */
 .filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;}
@@ -400,6 +428,9 @@ tr:hover td{background:var(--bg);}
           <p id="plans-sub">Goals by quantity</p>
         </div>
 
+        <!-- Category stats -->
+        <div id="cat-stats-wrap" class="mb20"></div>
+
         <!-- Overall plan progress bar -->
         <div class="card mb20" id="plans-overall-card">
           <div class="card-title">Overall Plan Completion Today</div>
@@ -497,6 +528,49 @@ const COLORS = ['#3b82f6','#10b981','#f59e0b','#06b6d4','#8b5cf6','#ef4444','#ec
 
 // ══ INIT ══
 window.onload = () => {
+  // ── Telegram Mini App init ──
+  if (window.Telegram && window.Telegram.WebApp) {
+    const tg = window.Telegram.WebApp
+    tg.ready()
+    tg.expand() // full screen
+
+    // Apply Telegram theme
+    document.body.classList.add('tg-app')
+
+    // Dark mode from Telegram
+    if (tg.colorScheme === 'dark') {
+      document.body.classList.add('dark')
+      S.theme = 'dark'
+    }
+
+    // Get user ID from Telegram if not in URL
+    if (!new URLSearchParams(location.search).get('uid') && tg.initDataUnsafe?.user?.id) {
+      S.uid = String(tg.initDataUnsafe.user.id)
+    }
+
+    // Use Telegram back button
+    tg.BackButton.onClick(() => {
+      nav('dashboard', document.querySelector('nav a'))
+      tg.BackButton.hide()
+    })
+
+    // Show back button when not on dashboard
+    document.querySelectorAll('nav a, .mob-nav a').forEach(a => {
+      const orig = a.getAttribute('onclick')
+      if (orig && !orig.includes('dashboard')) {
+        a.addEventListener('click', () => tg.BackButton.show())
+      } else if (orig && orig.includes('dashboard')) {
+        a.addEventListener('click', () => tg.BackButton.hide())
+      }
+    })
+
+    // Main button for refresh
+    tg.MainButton.setText('Обновить данные')
+    tg.MainButton.onClick(() => loadData(true))
+    tg.MainButton.show()
+  }
+
+
   const urlUid = new URLSearchParams(location.search).get('uid')
   if (urlUid) S.uid = urlUid
   applyTheme(S.theme)
@@ -580,7 +654,7 @@ async function loadData(manual) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const json = await res.json()
     if (!Array.isArray(json.rows)) throw new Error('Expected { rows: [...] }')
-    S.data = processData(json.rows, json.plans || [])
+    S.data = processData(json.rows, json.plans || [], json.categories || [])
     S.lastUpd = new Date()
     render()
     setStatus('live', `${json.rows.length} rows`)
@@ -621,7 +695,7 @@ function fmtAmt(v) { return v===Math.floor(v)?String(Math.floor(v)):String(v) }
 function pct(v,d=0){ return (v*100).toFixed(d)+'%' }
 function rcls(v){ return v>=.75?'g':v>=.5?'w':'r' }
 
-function processData(rows, planRows) {
+function processData(rows, planRows, json_categories) {
   // habits
   const habitSet = new Map()
   rows.forEach(r => {
@@ -732,9 +806,19 @@ function processData(rows, planRows) {
     .map(h=>({ name:h.name, color:h.color, plan:plansMap[h.name.toLowerCase()]||null, todayAmt:todayAmounts[h.name]||0 }))
     .filter(p=>p.plan && p.plan.target>0)
 
+  // Process categories
+  const categories = (json_categories || []).map(cat => {
+    const catHabits = habits.filter(h =>
+      entries.some(e => e.habitId === h.id) || true
+    )
+    // actual_pct from server or compute client-side
+    return cat
+  })
+
   return {
     habits, entries, todayEntries, dailies, weeklies, monthlies,
     habitMetrics, gCur, gBest, totalDone, plansToday, plansMap, todayAmounts,
+    categories: json_categories || [],
   }
 }
 
@@ -1025,9 +1109,53 @@ function renderPlansToday(D) {
   qs('#plans-today').innerHTML = html
 }
 
+// ── CATEGORY STATS ──────────────────────────────────────────
+function renderCategoryStats(D) {
+  const wrap = document.getElementById('cat-stats-wrap')
+  if (!wrap) return
+  if (!D.categories || !D.categories.length) { wrap.innerHTML=''; return }
+
+  wrap.innerHTML = D.categories.map(cat => {
+    const actual = cat.actual_pct
+    const target = cat.target_pct
+    const diff   = actual - target
+    const barColor = actual >= target ? 'var(--success)' : actual >= target*0.7 ? '#f59e0b' : 'var(--danger)'
+    const badgeCls = actual >= target ? 'good' : actual >= target*0.7 ? 'warn' : 'bad'
+    const targetPos = Math.min(target, 100)
+
+    const habitsHtml = cat.habits.map(h => {
+      const hp = h.completion_pct
+      const hc = hp>=70?'var(--success)':hp>=40?'#f59e0b':'var(--danger)'
+      return `<div class="cat-habit-item">
+        <div class="cat-habit-name">${h.name}</div>
+        <div class="cat-habit-bar"><div class="cat-habit-fill" style="width:${hp}%;background:${hc}"></div></div>
+        <div class="cat-habit-pct">${hp}%${h.plan?` · ${fmtAmt(h.today_amount)}/${fmtAmt(h.plan.target_amount)} ${h.plan.unit}`:''}</div>
+      </div>`
+    }).join('')
+
+    return `<div class="cat-card">
+      <div class="cat-header">
+        <div class="cat-name">${cat.name}</div>
+        <span class="cat-badge ${badgeCls}">${actual}% / план ${target}%</span>
+      </div>
+      <div class="cat-bar-wrap">
+        <div class="cat-bar-actual" style="width:${actual}%;background:${barColor}"></div>
+        <div class="cat-bar-target" style="left:${targetPos}%"></div>
+      </div>
+      <div class="cat-numbers">
+        <span>Факт: <strong>${actual}%</strong></span>
+        <span>Цель: <strong>${target}%</strong></span>
+        <span style="color:${diff>=0?'var(--success)':'var(--danger)'}">${diff>=0?'+':''}${diff}% от цели</span>
+      </div>
+      <div class="cat-habits">${habitsHtml}</div>
+    </div>`
+  }).join('')
+}
+
 // ── PLANS PAGE ───────────────────────────────────────────────
 function renderPlansPage(D) {
   qs('#plans-sub').textContent = `${D.plansToday.length} active plans`
+  renderCategoryStats(D)
 
   // Overall big bar
   let overallHtml = ''
