@@ -395,7 +395,7 @@ tr:hover td{background:var(--bg);}
             <div class="card-title">Today</div>
             <div id="today-block"></div>
           </div>
-          <!-- Today -->
+          <!-- Plans today -->
           <div class="card">
             <div class="card-title">Plan Progress Today</div>
             <div id="plans-today"></div>
@@ -963,25 +963,43 @@ function renderHero(D) {
   const todayDone  = D.todayEntries.filter(e=>e.status==='completed').length
   const todayTotal = D.habits.length
 
-  // Plan % Today — average across all active plans
-  let planPct = 0
-  if (D.plansToday.length) {
-    const sum = D.plansToday.reduce((s,p) => {
-      return s + (p.plan.target>0 ? Math.min(p.todayAmt/p.plan.target, 1) : 0)
-    }, 0)
-    planPct = Math.round(sum / D.plansToday.length * 100)
+  // Determine period label for ring sub
+  const isToday = !F.from || (F.from === F.to && F.from === fmtDateLocal(new Date()))
+  const isWeek  = F.from && F.from === fmtDateLocal(new Date(new Date().setDate(new Date().getDate()-6)))
+  const isMonth = F.from && F.from === fmtDateLocal(new Date(new Date().setDate(new Date().getDate()-29)))
+
+  let ringPct = 0
+  let ringLabel = 'plan today'
+
+  if (isToday || (!F.from && !F.to)) {
+    // Show plan % today
+    if (D.plansToday.length) {
+      const sum = D.plansToday.reduce((s,p) =>
+        s + (p.plan.target>0 ? Math.min(p.todayAmt/p.plan.target, 1) : 0), 0)
+      ringPct = Math.round(sum / D.plansToday.length * 100)
+      ringLabel = 'plan today'
+    } else {
+      ringPct = todayTotal ? Math.round(todayDone/todayTotal*100) : 0
+      ringLabel = 'today'
+    }
   } else {
-    // No plans — fall back to habit completion
-    planPct = todayTotal ? Math.round(todayDone/todayTotal*100) : 0
+    // Show completion rate for selected period
+    const from = F.from || '0000-00-00'
+    const to   = F.to   || fmtDateLocal(new Date())
+    const pe   = D.entries.filter(e => e.date >= from && e.date <= to && e.status !== 'pending')
+    const done = pe.filter(e => e.status === 'completed').length
+    ringPct = pe.length > 0 ? Math.round(done / pe.length * 100) : 0
+    ringLabel = isWeek ? 'this week' : isMonth ? 'this month' : 'period'
   }
 
-  const circ  = 2 * Math.PI * 56
-  const offset = circ - (planPct / 100 * circ)
+  const circ   = 2 * Math.PI * 56
+  const offset = circ - (ringPct / 100 * circ)
   const fill   = qs('#ring-fill')
   fill.style.strokeDashoffset = offset
-  fill.style.stroke = planPct>=75?'#4ade80':planPct>=50?'#fbbf24':'#f87171'
+  fill.style.stroke = ringPct>=75?'#4ade80':ringPct>=50?'#fbbf24':'#f87171'
 
-  qs('#ring-pct').textContent = planPct + '%'
+  qs('#ring-pct').textContent = ringPct + '%'
+  qs('#ring-sub').textContent = ringLabel
   qs('#hs-done').textContent  = `${todayDone}/${todayTotal}`
   qs('#hs-streak').textContent = D.gCur + 'd'
   qs('#hs-plans').textContent  = D.plansToday.length
@@ -1148,23 +1166,60 @@ function renderCategoryStats(D) {
   if (!wrap) return
   if (!D.categories || !D.categories.length) { wrap.innerHTML=''; return }
 
+  // Use active filter period for calculation
+  const from = F.from || '0000-00-00'
+  const to   = F.to   || fmtDateLocal(new Date())
+
+  // Compute client-side: group habits by category name
+  const habitsByCategory = {}
+  D.habits.forEach(h => {
+    const cat = h.category || 'General'
+    if (!habitsByCategory[cat]) habitsByCategory[cat] = []
+    habitsByCategory[cat].push(h)
+  })
+
   wrap.innerHTML = D.categories.map(cat => {
-    const actual = cat.actual_pct
-    const target = cat.target_pct
-    const diff   = actual - target
+    const target    = cat.target_pct
+    const catHabits = habitsByCategory[cat.name] || []
+
+    // Compute actual_pct from filtered entries
+    const habitDetails = catHabits.map(h => {
+      const hEntries = D.entries.filter(e =>
+        e.habitId === h.id && e.status !== 'pending' &&
+        e.date >= from && e.date <= to
+      )
+      const done  = hEntries.filter(e => e.status === 'completed').length
+      const total = hEntries.length
+      const compPct = total > 0 ? Math.round(done/total*100) : 0
+
+      const plan = D.plansMap[h.name.toLowerCase()]
+      const todayAmt = D.todayAmounts[h.name] || 0
+      const planPct  = plan && plan.target > 0
+        ? Math.min(Math.round(todayAmt/plan.target*100), 100) : 0
+
+      return { name:h.name, completion_pct:compPct,
+               plan_pct:planPct, plan, today_amount:todayAmt }
+    })
+
+    // actual = average of all habit completion rates in this category
+    const actual = habitDetails.length > 0
+      ? Math.round(habitDetails.reduce((s,h)=>s+h.completion_pct,0)/habitDetails.length)
+      : 0
+
+    const diff     = actual - target
     const barColor = actual >= target ? 'var(--success)' : actual >= target*0.7 ? '#f59e0b' : 'var(--danger)'
     const badgeCls = actual >= target ? 'good' : actual >= target*0.7 ? 'warn' : 'bad'
     const targetPos = Math.min(target, 100)
 
-    const habitsHtml = cat.habits.map(h => {
+    const habitsHtml = habitDetails.length > 0 ? habitDetails.map(h => {
       const hp = h.completion_pct
       const hc = hp>=70?'var(--success)':hp>=40?'#f59e0b':'var(--danger)'
       return `<div class="cat-habit-item">
         <div class="cat-habit-name">${h.name}</div>
         <div class="cat-habit-bar"><div class="cat-habit-fill" style="width:${hp}%;background:${hc}"></div></div>
-        <div class="cat-habit-pct">${hp}%${h.plan?` · ${fmtAmt(h.today_amount)}/${fmtAmt(h.plan.target_amount)} ${h.plan.unit}`:''}</div>
+        <div class="cat-habit-pct">${hp}%${h.plan?` · ${fmtAmt(h.today_amount)}/${fmtAmt(h.plan.target_amount||h.plan.target)} ${h.plan.unit}`:''}</div>
       </div>`
-    }).join('')
+    }).join('') : `<div style="font-size:12px;color:var(--muted);padding:8px 0">Добавь задачи в категорию «${cat.name}» через бот:<br>/addcat ${cat.name} ${target} → /add задача</div>`
 
     return `<div class="cat-card">
       <div class="cat-header">
@@ -1422,26 +1477,57 @@ function renderHabitsPage(D) {
 
 // ── PROGRESS PAGE ─────────────────────────────────────────────
 function renderProgressPage(D) {
-  const cW=D.weeklies.at(-1),pW=D.weeklies.at(-2)
-  const delta=cW&&pW?cW.rate-pW.rate:null
+  const todayStr = fmtDateLocal(new Date())
+
+  // This week: Mon–today
+  const thisWeekStart = fmtDateLocal(new Date(new Date().setDate(new Date().getDate()-6)))
+  const twEntries = S.data.entries.filter(e =>
+    e.date >= thisWeekStart && e.date <= todayStr && e.status !== 'pending')
+  const twDone  = twEntries.filter(e=>e.status==='completed').length
+  const twTotal = twEntries.length
+  const twRate  = twTotal > 0 ? twDone/twTotal : 0
+
+  // Last week
+  const lwStart = fmtDateLocal(new Date(new Date().setDate(new Date().getDate()-13)))
+  const lwEnd   = fmtDateLocal(new Date(new Date().setDate(new Date().getDate()-7)))
+  const lwEntries = S.data.entries.filter(e =>
+    e.date >= lwStart && e.date <= lwEnd && e.status !== 'pending')
+  const lwDone  = lwEntries.filter(e=>e.status==='completed').length
+  const lwTotal = lwEntries.length
+  const lwRate  = lwTotal > 0 ? lwDone/lwTotal : 0
+
+  const delta = twTotal > 0 && lwTotal > 0 ? twRate - lwRate : null
+
+  const twLabel = twTotal > 0 ? `${twDone}/${twTotal} entries` : 'no data yet'
+  const lwLabel = lwTotal > 0 ? `${lwDone}/${lwTotal} entries` : 'no data'
+
   qs('#prog-cmp').innerHTML=[
-    {l:'This Week',v:pct(cW?.rate??0),s:cW?.weekLabel??''},
-    {l:'Last Week', v:pct(pW?.rate??0),s:pW?.weekLabel??''},
-    {l:'Change',    v:delta!==null?(delta>=0?'+':'')+pct(delta):'—',s:'vs last week',c:delta===null?'':delta>=0?'g':'r'},
+    {l:'This Week',  v: twTotal>0 ? pct(twRate) : '—', s:twLabel, c: twTotal>0?rcls(twRate):''},
+    {l:'Last Week',  v: lwTotal>0 ? pct(lwRate) : '—', s:lwLabel, c: lwTotal>0?rcls(lwRate):''},
+    {l:'Change',     v: delta!==null?(delta>=0?'+':'')+pct(delta):'—', s:'vs last week',
+     c: delta===null?'':delta>=0?'g':'r'},
   ].map(k=>`<div class="kpi ${k.c||''}"><div class="kpi-lbl">${k.l}</div><div class="kpi-val">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('')
 
-  const s=[...D.habitMetrics].sort((a,b)=>b.completionRate-a.completionRate)
-  qs('#sw-block').innerHTML=`
-    <div style="margin-bottom:14px">
-      <div class="kpi-lbl">Strongest</div>
-      <div style="font-size:15px;font-weight:700">${s[0]?.habit.name??'—'}</div>
-      <div style="font-size:22px;font-weight:800;color:var(--success)">${s[0]?pct(s[0].completionRate):'—'}</div>
-    </div>
-    <div>
-      <div class="kpi-lbl">Weakest</div>
-      <div style="font-size:15px;font-weight:700">${s.at(-1)?.habit.name??'—'}</div>
-      <div style="font-size:22px;font-weight:800;color:var(--danger)">${s.at(-1)?pct(s.at(-1).completionRate):'—'}</div>
-    </div>`
+  // Strongest/Weakest — only meaningful if >1 day of data
+  const s = [...D.habitMetrics].sort((a,b)=>b.completionRate-a.completionRate)
+  const hasEnoughData = S.data.dailies.length > 1
+  const strongPct = s[0] ? pct(s[0].completionRate) : '—'
+  const weakPct   = s.at(-1) ? pct(s.at(-1).completionRate) : '—'
+  const sameHabit = s.length > 0 && s[0]?.habit.name === s.at(-1)?.habit.name
+
+  qs('#sw-block').innerHTML = !hasEnoughData
+    ? `<div style="color:var(--muted);font-size:13px;padding:12px 0">Track habits for a few more days to see strongest vs weakest comparison.</div>`
+    : `<div style="margin-bottom:14px">
+        <div class="kpi-lbl">Strongest</div>
+        <div style="font-size:15px;font-weight:700">${s[0]?.habit.name??'—'}</div>
+        <div style="font-size:22px;font-weight:800;color:var(--success)">${strongPct}</div>
+      </div>
+      <div>
+        <div class="kpi-lbl">Weakest</div>
+        <div style="font-size:15px;font-weight:700">${sameHabit?'—':s.at(-1)?.habit.name??'—'}</div>
+        <div style="font-size:22px;font-weight:800;color:var(--danger)">${sameHabit?'Need more data':weakPct}</div>
+      </div>`
+
   renderWeekdayChart(D)
   renderMonthlyChart(D)
 }
