@@ -985,8 +985,10 @@ function renderKPI(D) {
   const todayDone = D.todayEntries.filter(e=>e.status==='completed').length
   const todaySkip = D.todayEntries.filter(e=>e.status==='skipped').length
   const total = D.habits.length
-  const wR = D.weeklies.at(-1)?.rate??0
-  const mR = D.monthlies.at(-1)?.rate??0
+  // Always use FULL data for week/month rates (ignore date filter)
+  const fullData = S.data
+  const wR = fullData.weeklies.at(-1)?.rate??0
+  const mR = fullData.monthlies.at(-1)?.rate??0
 
   // Plan completion today (average)
   let planPct = 0
