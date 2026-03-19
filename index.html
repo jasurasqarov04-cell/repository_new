@@ -1173,60 +1173,81 @@ function renderCategoryStats(D) {
   if (!wrap) return
   if (!D.categories || !D.categories.length) { wrap.innerHTML=''; return }
 
-  // Use active filter period for calculation
   const from = F.from || '0000-00-00'
   const to   = F.to   || fmtDateLocal(new Date())
 
-  // Compute client-side: group habits by category name
-  const habitsByCategory = {}
-  D.habits.forEach(h => {
-    const cat = h.category || 'General'
-    if (!habitsByCategory[cat]) habitsByCategory[cat] = []
-    habitsByCategory[cat].push(h)
+  // Build habit→category map from ALL entries (category field on each entry)
+  // AND from habits array (h.category)
+  const habitCatMap = {}
+  D.habits.forEach(h => { habitCatMap[h.name] = h.category || 'General' })
+  // Also update from entries which carry category from Habits sheet
+  D.entries.forEach(e => {
+    if (e.category && e.category !== 'General' && e.habitName) {
+      habitCatMap[e.habitName] = e.category
+      // Update the habit object too
+      const h = D.habits.find(h => h.name === e.habitName)
+      if (h) h.category = e.category
+    }
   })
 
   wrap.innerHTML = D.categories.map(cat => {
-    const target    = cat.target_pct
-    const catHabits = habitsByCategory[cat.name] || []
+    const target = cat.target_pct
 
-    // Compute actual_pct from filtered entries
-    const habitDetails = catHabits.map(h => {
+    // Find habits belonging to this category
+    const catHabitNames = Object.entries(habitCatMap)
+      .filter(([,c]) => c === cat.name)
+      .map(([name]) => name)
+
+    // If server already computed habits with completion_pct — use those
+    const serverHabits = cat.habits || []
+
+    // Compute from entries for the active filter period
+    const habitDetails = catHabitNames.map(hName => {
+      const h = D.habits.find(h => h.name === hName)
+      if (!h) return null
       const hEntries = D.entries.filter(e =>
         e.habitId === h.id && e.status !== 'pending' &&
         e.date >= from && e.date <= to
       )
       const done  = hEntries.filter(e => e.status === 'completed').length
       const total = hEntries.length
-      const compPct = total > 0 ? Math.round(done/total*100) : 0
+      const compPct = total > 0 ? Math.round(done / total * 100) : 0
+      const plan = D.plansMap[hName.toLowerCase()]
+      const todayAmt = D.todayAmounts[hName] || 0
+      const planPct = plan && plan.target > 0
+        ? Math.min(Math.round(todayAmt / plan.target * 100), 100) : 0
+      return { name: hName, completion_pct: compPct, plan_pct: planPct, plan, today_amount: todayAmt }
+    }).filter(Boolean)
 
-      const plan = D.plansMap[h.name.toLowerCase()]
-      const todayAmt = D.todayAmounts[h.name] || 0
-      const planPct  = plan && plan.target > 0
-        ? Math.min(Math.round(todayAmt/plan.target*100), 100) : 0
+    // Use server habits if client found nothing (fallback)
+    const finalHabits = habitDetails.length > 0 ? habitDetails : serverHabits
 
-      return { name:h.name, completion_pct:compPct,
-               plan_pct:planPct, plan, today_amount:todayAmt }
-    })
-
-    // actual = average of all habit completion rates in this category
-    const actual = habitDetails.length > 0
-      ? Math.round(habitDetails.reduce((s,h)=>s+h.completion_pct,0)/habitDetails.length)
-      : 0
+    const actual = finalHabits.length > 0
+      ? Math.round(finalHabits.reduce((s, h) => s + h.completion_pct, 0) / finalHabits.length)
+      : (cat.actual_pct || 0)
 
     const diff     = actual - target
-    const barColor = actual >= target ? 'var(--success)' : actual >= target*0.7 ? '#f59e0b' : 'var(--danger)'
-    const badgeCls = actual >= target ? 'good' : actual >= target*0.7 ? 'warn' : 'bad'
+    const barColor = actual >= target ? 'var(--success)' : actual >= target * 0.7 ? '#f59e0b' : 'var(--danger)'
+    const badgeCls = actual >= target ? 'good' : actual >= target * 0.7 ? 'warn' : 'bad'
     const targetPos = Math.min(target, 100)
 
-    const habitsHtml = habitDetails.length > 0 ? habitDetails.map(h => {
-      const hp = h.completion_pct
-      const hc = hp>=70?'var(--success)':hp>=40?'#f59e0b':'var(--danger)'
-      return `<div class="cat-habit-item">
-        <div class="cat-habit-name">${h.name}</div>
-        <div class="cat-habit-bar"><div class="cat-habit-fill" style="width:${hp}%;background:${hc}"></div></div>
-        <div class="cat-habit-pct">${hp}%${h.plan?` · ${fmtAmt(h.today_amount)}/${fmtAmt(h.plan.target_amount||h.plan.target)} ${h.plan.unit}`:''}</div>
-      </div>`
-    }).join('') : `<div style="font-size:12px;color:var(--muted);padding:8px 0">Добавь задачи в категорию «${cat.name}» через бот:<br>/addcat ${cat.name} ${target} → /add задача</div>`
+    const habitsHtml = finalHabits.length > 0
+      ? finalHabits.map(h => {
+          const hp = h.completion_pct
+          const hc = hp >= 70 ? 'var(--success)' : hp >= 40 ? '#f59e0b' : 'var(--danger)'
+          const planStr = h.plan
+            ? ` · ${fmtAmt(h.today_amount)} / ${fmtAmt(h.plan.target_amount || h.plan.target)} ${h.plan.unit}`
+            : ''
+          return `<div class="cat-habit-item">
+            <div class="cat-habit-name">${h.name}</div>
+            <div class="cat-habit-bar"><div class="cat-habit-fill" style="width:${hp}%;background:${hc}"></div></div>
+            <div class="cat-habit-pct">${hp}%${planStr}</div>
+          </div>`
+        }).join('')
+      : `<div style="font-size:12px;color:var(--muted);padding:8px 0">
+           Нет задач в категории «${cat.name}».<br>
+           При добавлении задачи выбери категорию «${cat.name}».
+         </div>`
 
     return `<div class="cat-card">
       <div class="cat-header">
@@ -1240,7 +1261,7 @@ function renderCategoryStats(D) {
       <div class="cat-numbers">
         <span>Факт: <strong>${actual}%</strong></span>
         <span>Цель: <strong>${target}%</strong></span>
-        <span style="color:${diff>=0?'var(--success)':'var(--danger)'}">${diff>=0?'+':''}${diff}% от цели</span>
+        <span style="color:${diff >= 0 ? 'var(--success)' : 'var(--danger)'}">${diff >= 0 ? '+' : ''}${diff}% от цели</span>
       </div>
       <div class="cat-habits">${habitsHtml}</div>
     </div>`
