@@ -433,9 +433,6 @@ tr:hover td{background:var(--bg);}
           <p id="plans-sub">Goals by quantity</p>
         </div>
 
-        <!-- Category stats -->
-        <div id="cat-stats-wrap" class="mb20"></div>
-
         <!-- Overall plan progress bar -->
         <div class="card mb20" id="plans-overall-card">
           <div class="card-title">Overall Plan Completion Today</div>
@@ -443,7 +440,11 @@ tr:hover td{background:var(--bg);}
         </div>
 
         <!-- Plan cards -->
-        <div class="plan-list" id="plan-list"></div>
+        <div class="plan-list mb20" id="plan-list"></div>
+
+        <!-- Category stats -->
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px" id="cat-stats-title"></div>
+        <div id="cat-stats-wrap"></div>
       </div>
 
       <!-- ══ HABITS ══ -->
@@ -1279,6 +1280,8 @@ function renderCategoryStats(D) {
 function renderPlansPage(D) {
   qs('#plans-sub').textContent = `${D.plansToday.length} active plans`
   renderCategoryStats(D)
+  const catTitle = document.getElementById('cat-stats-title')
+  if (catTitle) catTitle.textContent = D.categories && D.categories.length ? 'By Category' : ''
 
   // Overall big bar
   let overallHtml = ''
